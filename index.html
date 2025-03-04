@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Thumbnail Extractor</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --card-bg: white;
+            --input-bg: white;
+            --code-bg: #eee;
+        }
+        .dark-mode {
+            --bg-color: #181818;
+            --text-color: #f8f9fa;
+            --card-bg: #222;
+            --input-bg: #333;
+            --code-bg: #444;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background 0.3s, color 0.3s;
+        }
+        h2 {
+            color: var(--text-color);
+        }
+        .top-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 10px;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .toggle-label {
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background: #ccc;
+            border-radius: 10px;
+            transition: 0.3s;
+        }
+        .toggle-switch:before {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .dark-mode .toggle-switch {
+            background: #007bff;
+        }
+        .dark-mode .toggle-switch:before {
+            left: 22px;
+        }
+        input {
+            width: 80%;
+            max-width: 500px;
+            padding: 10px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: var(--input-bg);
+            color: var(--text-color);
+        }
+        .thumbnail-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            margin: 10px;
+            text-align: center;
+            background: var(--card-bg);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 340px;
+            transition: background 0.3s;
+        }
+        .thumbnail img {
+            width: 100%;
+            max-width: 320px;
+            height: auto;
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+        .thumbnail img:hover {
+            transform: scale(1.05);
+        }
+        .details {
+            font-size: 14px;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+        code {
+            display: block;
+            background: var(--code-bg);
+            padding: 5px;
+            border-radius: 5px;
+            margin-top: 5px;
+            font-size: 14px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="toggle-container" onclick="toggleDarkMode()">
+            <span class="toggle-label">🌙 Dark Mode</span>
+            <div class="toggle-switch"></div>
+        </div>
+    </div>
+
+    <h2>YouTube Thumbnail Extractor</h2>
+    <input type="text" id="videoInput" placeholder="Enter YouTube Video URL or ID">
+
+    <div id="thumbnailResults" class="thumbnail-container"></div>
+
+    <script>
+        function extractVideoID(url) {
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : url; 
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes >= 1024 * 1024) {
+                return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+            } else if (bytes >= 1024) {
+                return (bytes / 1024).toFixed(2) + " KB";
+            } else {
+                return bytes + " B";
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Copied to clipboard!");
+            }).catch(err => {
+                console.error("Failed to copy: ", err);
+            });
+        }
+
+        function generateThumbnails() {
+            const input = document.getElementById("videoInput").value;
+            const videoID = extractVideoID(input);
+            if (!videoID) {
+                alert("Invalid YouTube URL or ID.");
+                return;
+            }
+
+            const sizes = [
+                { name: "Max Resolution", key: "maxresdefault" },
+                { name: "Standard Definition", key: "sddefault" },
+                { name: "High Quality", key: "hqdefault" },
+                { name: "Medium Quality", key: "mqdefault" },
+                { name: "Default", key: "default" }
+            ];
+
+            const resultsDiv = document.getElementById("thumbnailResults");
+            resultsDiv.innerHTML = "";
+
+            sizes.forEach(size => {
+                const imgUrl = `https://i.ytimg.com/vi/${videoID}/${size.key}.jpg`;
+                const div = document.createElement("div");
+                div.className = "thumbnail";
+                div.innerHTML = `<a href="${imgUrl}" target="_blank">
+                                    <img id="${size.key}" src="${imgUrl}" alt="${size.name}">
+                                 </a>
+                                 <p><strong>${size.name}</strong></p>
+                                 <p class="details">Resolution: <span id="resolution-${size.key}">Loading...</span></p>
+                                 <p class="details">File Size: <span id="filesize-${size.key}">Loading...</span></p>
+                                 <button onclick="copyToClipboard('${imgUrl}')">📋 Copy Link</button>
+                                 <a href="${imgUrl}" download><button>📥 Download</button></a>
+                                 <code>${imgUrl}</code>`;
+                resultsDiv.appendChild(div);
+
+                // Load image to get actual resolution
+                const img = new Image();
+                img.src = imgUrl;
+                img.onload = function () {
+                    document.getElementById(`resolution-${size.key}`).textContent = `${img.width} x ${img.height}`;
+                };
+                img.onerror = function () {
+                    document.getElementById(`resolution-${size.key}`).textContent = "Unavailable";
+                };
+
+                // Fetch file size
+                fetch(imgUrl)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        document.getElementById(`filesize-${size.key}`).textContent = formatFileSize(blob.size);
+                    })
+                    .catch(() => {
+                        document.getElementById(`filesize-${size.key}`).textContent = "Unavailable";
+                    });
+            });
+        }
+
+        document.getElementById("videoInput").addEventListener("input", generateThumbnails);
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+            localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+        }
+
+        function loadDarkMode() {
+            if (localStorage.getItem("darkMode") === "true") {
+                document.body.classList.add("dark-mode");
+            }
+        }
+
+        loadDarkMode();
+    </script>
+
+</body>
+</html>

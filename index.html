@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Thumbnail Extractor</title>
+    <title>YouTube & Apple Music Thumbnail Extractor</title>
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -26,9 +26,6 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             transition: background 0.3s, color 0.3s;
-        }
-        h2 {
-            color: var(--text-color);
         }
         .top-bar {
             display: flex;
@@ -132,26 +129,78 @@
         </div>
     </div>
 
-    <h2>YouTube Thumbnail Extractor</h2>
-    <input type="text" id="videoInput" placeholder="Enter YouTube Video URL or ID">
+    <h2>YouTube & Apple Music Thumbnail Extractor</h2>
+    <input type="text" id="videoInput" placeholder="Enter YouTube or Apple Music URL">
 
     <div id="thumbnailResults" class="thumbnail-container"></div>
 
     <script>
-        function extractVideoID(url) {
+        function extractYouTubeID(url) {
             const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
             const match = url.match(regex);
-            return match ? match[1] : url; 
+            return match ? match[1] : null; 
         }
 
-        function formatFileSize(bytes) {
-            if (bytes >= 1024 * 1024) {
-                return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-            } else if (bytes >= 1024) {
-                return (bytes / 1024).toFixed(2) + " KB";
+        function extractAppleMusicAlbumID(url) {
+            const regex = /music\.apple\.com\/(?:[a-z]{2}\/)?album\/(?:[^/]+\/)?(\d+)/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        function generateThumbnails() {
+            const input = document.getElementById("videoInput").value;
+            const youtubeID = extractYouTubeID(input);
+            const appleAlbumID = extractAppleMusicAlbumID(input);
+
+            const resultsDiv = document.getElementById("thumbnailResults");
+            resultsDiv.innerHTML = "";
+
+            if (youtubeID) {
+                generateYouTubeThumbnails(youtubeID);
+            } else if (appleAlbumID) {
+                fetchAppleMusicArtwork(appleAlbumID);
             } else {
-                return bytes + " B";
+                resultsDiv.innerHTML = "<p style='color: red;'>Invalid URL. Please enter a valid YouTube or Apple Music album link.</p>";
             }
+        }
+
+        function generateYouTubeThumbnails(videoID) {
+            const sizes = ["maxresdefault", "sddefault", "hqdefault", "mqdefault", "default"];
+            const resultsDiv = document.getElementById("thumbnailResults");
+
+            sizes.forEach(size => {
+                const imgUrl = `https://i.ytimg.com/vi/${videoID}/${size}.jpg`;
+                createThumbnail(imgUrl, size);
+            });
+        }
+
+        function fetchAppleMusicArtwork(albumID) {
+            const appleMusicAPI = `https://itunes.apple.com/lookup?id=${albumID}`;
+
+            fetch(appleMusicAPI)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        let imgUrl = data.results[0].artworkUrl100.replace("100x100", "3000x3000");
+                        createThumbnail(imgUrl, "Apple Music Album Art");
+                    }
+                })
+                .catch(() => {
+                    document.getElementById("thumbnailResults").innerHTML = "<p style='color: red;'>Failed to fetch album art.</p>";
+                });
+        }
+
+        function createThumbnail(imgUrl, label) {
+            const div = document.createElement("div");
+            div.className = "thumbnail";
+            div.innerHTML = `<a href="${imgUrl}" target="_blank">
+                                <img src="${imgUrl}" alt="${label}">
+                             </a>
+                             <p><strong>${label}</strong></p>
+                             <button onclick="copyToClipboard('${imgUrl}')">📋 Copy Link</button>
+                             <button onclick="downloadImage('${imgUrl}', '${label}')">📥 Download</button>
+                             <code>${imgUrl}</code>`;
+            document.getElementById("thumbnailResults").appendChild(div);
         }
 
         function copyToClipboard(text) {
@@ -162,63 +211,14 @@
             });
         }
 
-        function generateThumbnails() {
-            const input = document.getElementById("videoInput").value;
-            const videoID = extractVideoID(input);
-            if (!videoID) {
-                alert("Invalid YouTube URL or ID.");
-                return;
-            }
-
-            const sizes = [
-                { name: "Max Resolution", key: "maxresdefault" },
-                { name: "Standard Definition", key: "sddefault" },
-                { name: "High Quality", key: "hqdefault" },
-                { name: "Medium Quality", key: "mqdefault" },
-                { name: "Default", key: "default" }
-            ];
-
-            const resultsDiv = document.getElementById("thumbnailResults");
-            resultsDiv.innerHTML = "";
-
-            sizes.forEach(size => {
-                const imgUrl = `https://i.ytimg.com/vi/${videoID}/${size.key}.jpg`;
-                const div = document.createElement("div");
-                div.className = "thumbnail";
-                div.innerHTML = `<a href="${imgUrl}" target="_blank">
-                                    <img id="${size.key}" src="${imgUrl}" alt="${size.name}">
-                                 </a>
-                                 <p><strong>${size.name}</strong></p>
-                                 <p class="details">Resolution: <span id="resolution-${size.key}">Loading...</span></p>
-                                 <p class="details">File Size: <span id="filesize-${size.key}">Loading...</span></p>
-                                 <button onclick="copyToClipboard('${imgUrl}')">📋 Copy Link</button>
-                                 <a href="${imgUrl}" download><button>📥 Download</button></a>
-                                 <code>${imgUrl}</code>`;
-                resultsDiv.appendChild(div);
-
-                // Load image to get actual resolution
-                const img = new Image();
-                img.src = imgUrl;
-                img.onload = function () {
-                    document.getElementById(`resolution-${size.key}`).textContent = `${img.width} x ${img.height}`;
-                };
-                img.onerror = function () {
-                    document.getElementById(`resolution-${size.key}`).textContent = "Unavailable";
-                };
-
-                // Fetch file size
-                fetch(imgUrl)
-                    .then(response => response.blob())
-                    .then(blob => {
-                        document.getElementById(`filesize-${size.key}`).textContent = formatFileSize(blob.size);
-                    })
-                    .catch(() => {
-                        document.getElementById(`filesize-${size.key}`).textContent = "Unavailable";
-                    });
-            });
+        function downloadImage(url, label) {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = label.replace(/[^a-z0-9]/gi, '_') + ".jpg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
-
-        document.getElementById("videoInput").addEventListener("input", generateThumbnails);
 
         function toggleDarkMode() {
             document.body.classList.toggle("dark-mode");
@@ -232,6 +232,7 @@
         }
 
         loadDarkMode();
+        document.getElementById("videoInput").addEventListener("input", generateThumbnails);
     </script>
 
 </body>
